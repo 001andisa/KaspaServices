@@ -11,13 +11,14 @@ import os, tarfile
 @auth.login_required
 def index():
     return "index"
-
+# Sudah create function baru di function/getauthtoken.py
 @app.route('/api/token/v1.0/getauthtoken', methods=['POST'])
 @auth.login_required
 def getauthtoken():
     token = g.user.generate_auth_token()
     return jsonify({'token': token.decode('ascii')})
-
+#
+# SUdah di buat function baru di function/downloadinstaller.py
 @app.route('/api/sensors/v1.0/downloadinstaller', methods=['GET'])
 def downloadinstaller():
     filename = 'installer.sh'
