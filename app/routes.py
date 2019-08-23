@@ -6,6 +6,16 @@ from flask_httpauth import HTTPBasicAuth
 from datetime import datetime
 import os, tarfile
 
+#manggil fungsi yang di pisah tadi
+#fungsi getauthtoken
+from function.getauthtoken import *
+#fungsi downloadinstaller
+from function.downloadinstaller import *
+#fungsi verifysensorkey
+from function.verifysensorkey import *
+#fungsi listsensors
+from function.listsensors import *
+
 @app.route('/')
 @app.route('/index')
 @auth.login_required
@@ -14,138 +24,25 @@ def index():
 # Sudah create function baru di function/getauthtoken.py
 @app.route('/api/token/v1.0/getauthtoken', methods=['POST'])
 @auth.login_required
-def getauthtoken():
-    token = g.user.generate_auth_token()
-    return jsonify({'token': token.decode('ascii')})
+getauthtoken()
 #
-# SUdah di buat function baru di function/downloadinstaller.py
+
+# Sudah di buat function baru di function/downloadinstaller.py
 @app.route('/api/sensors/v1.0/downloadinstaller', methods=['GET'])
-def downloadinstaller():
-    filename = 'installer.sh'
-    filedir = app.config['BASEDIR'] + '/app/static/'
+downloadinstaller()
+#
 
-    return send_from_directory(filedir, filename, as_attachment=True)
-
+#Sudah di buat function verifysensorkey di function/verifysensorkey.py
 @app.route('/api/sensors/v1.0/verifysensorkey', methods=['POST'])
 @auth.login_required
-def verifysensorkey():
-    device_id = request.json.get('device_id')
-    sensor_key = request.json.get('sensor_key')
-    netint = request.json.get('netint')
-    print(device_id)
-    print(sensor_key)
-    print(netint)
-    if device_id is None or sensor_key is None or netint is None:
-        abort(400)
-    q = Sensor.objects.filter(company = g.user['company'])
-    q = q.filter(device_id = device_id)
-    sensor = q.first()
+verifysensorkey()
+#
 
-    if sensor is None:
-        abort(400)
-
-    #create tarball
-
-    buildfile = 'build_snoqtt.sh'
-    conffile = 'env-conf.conf'
-    removefile = 'remove_snoqtt.sh'
-    startfile = 'start_snoqtt.sh'
-    stopfile = 'stop_snoqtt.sh'
-    
-    filedirtemplate = app.config['BASEDIR'] + '/app/static/template/'
-    
-    if not os.path.exists(app.config['BASEDIR'] + '/app/static/generated/{}/'.format(sensor_key)):
-        os.makedirs(app.config['BASEDIR'] + '/app/static/generated/{}/'.format(sensor_key))
-    
-    filediroutput = app.config['BASEDIR'] + '/app/static/generated/{}/'.format(sensor_key)
-
-    with open(filedirtemplate + buildfile) as build_template:
-        templatebuild = build_template.read()
-    with open(filediroutput + buildfile, "w") as current:
-        current.write(templatebuild.format(protected_subnet=sensor['protected_subnet'],
-                                            external_subnet="'{}'".format(sensor['external_subnet']),
-                                            oinkcode=sensor['oinkcode']))
-    
-    with open(filedirtemplate + conffile) as conf_template:
-        templateconf = conf_template.read()
-    with open(filediroutput + conffile, "w") as current:
-        current.write(templateconf.format(global_topic=sensor['topic_global'],
-                                            global_server='103.24.56.244',
-                                            global_port='1883',
-                                            device_id=sensor['device_id'],
-                                            oinkcode=sensor['oinkcode'],
-                                            protected_subnet=sensor['protected_subnet'],
-                                            external_subnet=sensor['external_subnet'],
-                                            netint=netint,
-                                            company=g.user['company']))
-    
-    with open(filedirtemplate + removefile) as remove_template:
-        templateremove = remove_template.read()
-    with open(filediroutput + removefile, "w") as current:
-        current.write(templateremove)
-
-    with open(filedirtemplate + startfile) as start_template:
-        templatestart = start_template.read()
-    with open(filediroutput + startfile, "w") as current:
-        current.write(templatestart)
-
-    with open(filedirtemplate + stopfile) as stop_template:
-        templatestop = stop_template.read()
-    with open(filediroutput + stopfile, "w") as current:
-        current.write(templatestop)
-
-    filetarname='snoqtt-{}.tar.gz'.format(sensor_key)
-    if os.path.exists(filediroutput + filetarname):
-        os.remove(filediroutput + filetarname)
-
-    tar = tarfile.open((filediroutput + filetarname), "w:gz")
-    tar.add(filediroutput + buildfile, arcname=buildfile)
-    tar.add(filediroutput + conffile, arcname=conffile)
-    tar.add(filediroutput + removefile, arcname=removefile)
-    tar.add(filediroutput + startfile, arcname=startfile)
-    tar.add(filediroutput + stopfile, arcname=stopfile)
-    tar.close()
-
-    os.remove(filediroutput + buildfile)
-    os.remove(filediroutput + conffile)
-    os.remove(filediroutput + removefile)
-    os.remove(filediroutput + startfile)
-    os.remove(filediroutput + stopfile)
-
-    return send_from_directory(filediroutput, filetarname, as_attachment=True)
-
+#sudah di buat function ;istsensors di function/listsensors.py
 @app.route('/api/sensors/v1.0/listsensors', methods=['POST'])
 @auth.login_required
-def listsensors():
-    company = g.user['company']
-    if company is None:
-        abort(400)
-    
-    obj={
-        "company" : g.user['company'],
-        "count" : 0,
-        "sensors" : []
-    }
-    for sensor in Sensor.objects.filter(company=company):
-        sensor_obj = {
-            "device_id" : sensor['device_id'],
-            "device_name" : sensor['device_name'],
-            "hostname" : sensor['hostname'],
-            "ip_address" : sensor['ip_address'],
-            "location" : sensor['location'],
-            "protected_subnet" : sensor['protected_subnet'],
-            "external_subnet" : sensor['external_subnet'],
-            "oinkcode" : sensor['oinkcode'],
-            "topic_global" : sensor['topic_global'],
-            "topic_cmd" : sensor['topic_cmd'],
-            "topic_resp" : sensor['topic_resp'],
-            "sensor_key" : sensor['sensor_key'],
-            "time_created" : sensor['time_created']
-        }
-        obj['sensors'].append(sensor_obj)
-        obj['count'] = obj['count'] + 1
-    
-    return jsonify(obj)
+listsensors()
+#
 
 @app.route('/api/sensors/v1.0/getsensordetail', methods=['POST'])
 @auth.login_required

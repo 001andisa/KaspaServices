@@ -6,7 +6,6 @@ from flask_httpauth import HTTPBasicAuth
 from datetime import datetime
 import os, tarfile
 
-@app.route('/api/sensors/v1.0/downloadinstaller', methods=['GET'])
 def downloadinstaller():
     filename = 'installer.sh'
     filedir = app.config['BASEDIR'] + '/app/static/'
